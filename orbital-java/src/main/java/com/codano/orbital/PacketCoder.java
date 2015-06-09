@@ -1,4 +1,4 @@
-package com.codano.hybridapp;
+package com.codano.orbital;
 
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
@@ -11,8 +11,8 @@ import com.grack.nanojson.JsonParserException;
 import com.grack.nanojson.JsonWriter;
 
 public class PacketCoder {
-	public static byte[] encode(HybridAppPacket packet) {
-		HybridAppData data = packet.getData();
+	public static byte[] encode(OrbitalAppPacket packet) {
+		OrbitalAppData data = packet.getData();
 		byte[] binary = data == null ? null : data.getBinary();
 		
 		byte[] json = null;
@@ -62,7 +62,7 @@ public class PacketCoder {
 		return buffer.array();
 	}
 
-	public static HybridAppPacket decode(byte[] bytes) throws PacketCoderException {
+	public static OrbitalAppPacket decode(byte[] bytes) throws PacketCoderException {
 		int flags = bytes[0];
 		boolean call = (flags & 1) != 0;
 		boolean hasEndpoint = (flags & (1 << 1)) != 0;
@@ -103,8 +103,8 @@ public class PacketCoder {
 			offset += len;
 		}
 
-		HybridAppData data = new HybridAppData(json, binary);
-		return new HybridAppPacket(call, endpoint, seqId, data);
+		OrbitalAppData data = new OrbitalAppData(json, binary);
+		return new OrbitalAppPacket(call, endpoint, seqId, data);
 	}
 	
 	private static int readInt(byte[] data, int offset) {

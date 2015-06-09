@@ -1,4 +1,4 @@
-package com.codano.hybridapp.ipc;
+package com.codano.orbital.ipc;
 
 import java.io.File;
 import java.io.FileInputStream;

@@ -1,4 +1,4 @@
-package com.codano.hybridapp;
+package com.codano.orbital;
 
 import java.awt.image.RenderedImage;
 import java.io.ByteArrayOutputStream;
@@ -8,21 +8,21 @@ import javax.imageio.ImageIO;
 
 import org.apache.commons.io.Charsets;
 
-public class HybridAppHttpResponse {
+public class OrbitalAppHttpResponse {
 	private String mimeType;
 	private byte[] data;
 
-	public HybridAppHttpResponse(String mimeType, byte[] data) {
+	public OrbitalAppHttpResponse(String mimeType, byte[] data) {
 		this.mimeType = mimeType;
 		this.data = data;
 	}
 
-	public HybridAppHttpResponse(String mimeType, String data) {
+	public OrbitalAppHttpResponse(String mimeType, String data) {
 		this.mimeType = mimeType;
 		this.data = data.getBytes(Charsets.UTF_8);
 	}
 
-	public HybridAppHttpResponse(RenderedImage data) {
+	public OrbitalAppHttpResponse(RenderedImage data) {
 		this.mimeType = "image/png";
 		ByteArrayOutputStream output = new ByteArrayOutputStream();
 		try {

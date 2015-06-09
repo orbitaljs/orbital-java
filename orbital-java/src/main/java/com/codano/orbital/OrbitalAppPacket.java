@@ -1,12 +1,12 @@
-package com.codano.hybridapp;
+package com.codano.orbital;
 
-public class HybridAppPacket {
+public class OrbitalAppPacket {
 	private boolean call;
 	private int seqId;
-	private HybridAppData data;
+	private OrbitalAppData data;
 	private String endpoint;
 	
-	public HybridAppPacket(boolean call, String endpoint, int seqId, HybridAppData data) {
+	public OrbitalAppPacket(boolean call, String endpoint, int seqId, OrbitalAppData data) {
 		this.call = call;
 		this.endpoint = endpoint;
 		this.seqId = seqId;
@@ -21,7 +21,7 @@ public class HybridAppPacket {
 		return call;
 	}
 	
-	public HybridAppData getData() {
+	public OrbitalAppData getData() {
 		return data;
 	}
 	

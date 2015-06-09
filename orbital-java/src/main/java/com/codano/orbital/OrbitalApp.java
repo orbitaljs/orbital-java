@@ -1,4 +1,4 @@
-package com.codano.hybridapp;
+package com.codano.orbital;
 
 import java.io.BufferedReader;
 import java.io.File;
@@ -20,20 +20,20 @@ import java.util.concurrent.atomic.AtomicInteger;
 import org.apache.commons.io.Charsets;
 import org.apache.commons.io.IOUtils;
 
-import com.codano.hybridapp.ipc.IpcPipe;
+import com.codano.orbital.ipc.IpcPipe;
 
-public class HybridApp {
+public class OrbitalApp {
 	/**
 	 * Semaphore that indicates we should defer the RPC response.
 	 */
-	private static final HybridAppData DEFER_RESPONSE = new HybridAppData();
+	private static final OrbitalAppData DEFER_RESPONSE = new OrbitalAppData();
 
 	private String appRoot, webRoot, electronPath;
-	private LinkedBlockingQueue<HybridAppPacket> send = new LinkedBlockingQueue<>();
+	private LinkedBlockingQueue<OrbitalAppPacket> send = new LinkedBlockingQueue<>();
 	private AtomicInteger seqId = new AtomicInteger();
-	private HashMap<Integer, CallbackData<HybridAppCallback>> callbacks = new HashMap<>();
-	private HashMap<String, CallbackData<HybridAppAsyncRpc>> listeners = new HashMap<>();
-	private HashMap<String, CallbackData<HybridAppHttpEndpoint>> httpListeners = new HashMap<>();
+	private HashMap<Integer, CallbackData<OrbitalAppCallback>> callbacks = new HashMap<>();
+	private HashMap<String, CallbackData<OrbitalAppAsyncRpc>> listeners = new HashMap<>();
+	private HashMap<String, CallbackData<OrbitalAppHttpEndpoint>> httpListeners = new HashMap<>();
 	private ExecutorService utilityThread = Executors.newSingleThreadExecutor();
 
 	private static interface IORunnable {
@@ -45,7 +45,7 @@ public class HybridApp {
 		T callback;
 	}
 
-	public HybridApp() {
+	public OrbitalApp() {
 		registerListener("http.request", utilityThread, (ep, data) -> {
 			return handleIncomingHttpRequest(data);
 		});
@@ -63,8 +63,8 @@ public class HybridApp {
 		this.electronPath = electronPath;
 	}
 	
-	public HybridAppData callBlocking(String endpoint, HybridAppData data) {
-		LinkedBlockingQueue<HybridAppData> q = new LinkedBlockingQueue<>(1);
+	public OrbitalAppData callBlocking(String endpoint, OrbitalAppData data) {
+		LinkedBlockingQueue<OrbitalAppData> q = new LinkedBlockingQueue<>(1);
 		call(endpoint, data, utilityThread, (retval) -> {
 			try {
 				q.put(retval);
@@ -82,21 +82,21 @@ public class HybridApp {
 		}
 	}
 	
-	public void call(String endpoint, HybridAppData data, Executor executor, HybridAppCallback callback) {
+	public void call(String endpoint, OrbitalAppData data, Executor executor, OrbitalAppCallback callback) {
 		int seq = seqId.incrementAndGet();
-		CallbackData<HybridAppCallback> callbackData = new CallbackData<>();
+		CallbackData<OrbitalAppCallback> callbackData = new CallbackData<>();
 		callbackData.callback = callback;
 		callbackData.executor = executor;
 		synchronized (callbacks) {
 			callbacks.put(seq, callbackData);
 		}
 		
-		send.add(new HybridAppPacket(true, endpoint, seq, data));
+		send.add(new OrbitalAppPacket(true, endpoint, seq, data));
 	}
 
-	public void callNoReturn(String endpoint, HybridAppData data) {
+	public void callNoReturn(String endpoint, OrbitalAppData data) {
 		// seq ID of zero -- no return value requested
-		send.add(new HybridAppPacket(true, endpoint, 0, data));
+		send.add(new OrbitalAppPacket(true, endpoint, 0, data));
 	}
 
 	public void start() throws IOException, InterruptedException {
@@ -189,7 +189,7 @@ public class HybridApp {
 	private void writeTo(OutputStream out) throws InterruptedException,
 			IOException {
 		while (true) {
-			HybridAppPacket packet = send.take();
+			OrbitalAppPacket packet = send.take();
 			byte[] buffer = PacketCoder.encode(packet);
 			String len = "*" + Integer.toString(buffer.length, 16) + "\n";
 			out.write(len.getBytes(Charsets.US_ASCII));
@@ -244,13 +244,13 @@ public class HybridApp {
 		}
 	}
 
-	private HybridAppData handleIncomingHttpRequest(HybridAppData data) {
+	private OrbitalAppData handleIncomingHttpRequest(OrbitalAppData data) {
 		String url = data.getJson().getString("url");
-		CallbackData<HybridAppHttpEndpoint> callback = httpListeners.get(url);
+		CallbackData<OrbitalAppHttpEndpoint> callback = httpListeners.get(url);
 		callback.executor.execute(() -> {
 			@SuppressWarnings({ "unchecked", "rawtypes" })
 			Map<String, String> query = (Map)data.getJson().getObject("query");
-			HybridAppHttpResponse response = callback.callback.request(url, query);
+			OrbitalAppHttpResponse response = callback.callback.request(url, query);
 			
 		});
 		
@@ -258,11 +258,11 @@ public class HybridApp {
 	}
 
 	private void handleIncomingPacket(byte[] buffer) {
-		HybridAppPacket packet = PacketCoder.decode(buffer);
+		OrbitalAppPacket packet = PacketCoder.decode(buffer);
 		String ep = packet.getEndpoint();
 		int seqId = packet.getSeqId();
 		if (ep == null) {
-			CallbackData<HybridAppCallback> callback;
+			CallbackData<OrbitalAppCallback> callback;
 			synchronized (callbacks) {
 				callback = callbacks.remove(seqId);
 			}
@@ -275,7 +275,7 @@ public class HybridApp {
 			}
 		} else {
 			if (listeners.containsKey(ep)) {
-				CallbackData<HybridAppAsyncRpc> listener = listeners.get(ep);
+				CallbackData<OrbitalAppAsyncRpc> listener = listeners.get(ep);
 				listener.executor.execute(() -> {
 					listener.callback.handle(ep, packet.getData(), (data) -> {
 						// The listener will deal with this
@@ -283,11 +283,11 @@ public class HybridApp {
 							return;
 						
 						if (data == null)
-							data = new HybridAppData();
+							data = new OrbitalAppData();
 						
 						if (seqId != 0) {
 							// Send return value
-							send.add(new HybridAppPacket(false, null, seqId, data));
+							send.add(new OrbitalAppPacket(false, null, seqId, data));
 						}
 					});					
 				});
@@ -297,8 +297,8 @@ public class HybridApp {
 		}
 	}
 
-	public void registerListener(String string, Executor executor, HybridAppVoidRpc rpc) {
-		CallbackData<HybridAppAsyncRpc> data = new CallbackData<>();
+	public void registerListener(String string, Executor executor, OrbitalAppVoidRpc rpc) {
+		CallbackData<OrbitalAppAsyncRpc> data = new CallbackData<>();
 		data.callback = (ep, d, cb) -> {
 			rpc.handle(ep, d);
 			cb.accept(null);
@@ -307,8 +307,8 @@ public class HybridApp {
 		listeners.put(string, data);
 	}
 	
-	public void registerListener(String string, Executor executor, HybridAppRpc rpc) {
-		CallbackData<HybridAppAsyncRpc> data = new CallbackData<>();
+	public void registerListener(String string, Executor executor, OrbitalAppRpc rpc) {
+		CallbackData<OrbitalAppAsyncRpc> data = new CallbackData<>();
 		data.callback = (ep, d, cb) -> {
 			cb.accept(rpc.handle(ep, d));
 		};
@@ -316,15 +316,15 @@ public class HybridApp {
 		listeners.put(string, data);
 	}
 
-	public void registerListener(String string, Executor executor, HybridAppAsyncRpc rpc) {
-		CallbackData<HybridAppAsyncRpc> data = new CallbackData<>();
+	public void registerListener(String string, Executor executor, OrbitalAppAsyncRpc rpc) {
+		CallbackData<OrbitalAppAsyncRpc> data = new CallbackData<>();
 		data.callback = rpc;
 		data.executor = executor;
 		listeners.put(string, data);
 	}
 
-	public void registerHttpEndpoint(String endpoint, Executor executor, HybridAppHttpEndpoint listener) {
-		CallbackData<HybridAppHttpEndpoint> data = new CallbackData<>();
+	public void registerHttpEndpoint(String endpoint, Executor executor, OrbitalAppHttpEndpoint listener) {
+		CallbackData<OrbitalAppHttpEndpoint> data = new CallbackData<>();
 		data.callback = listener;
 		data.executor = executor;
 		httpListeners.put(endpoint, data);

@@ -1,4 +1,4 @@
-package com.codano.hybridapp;
+package com.codano.orbital;
 
 @SuppressWarnings("serial")
 public class PacketCoderException extends RuntimeException {

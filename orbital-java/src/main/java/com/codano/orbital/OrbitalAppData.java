@@ -1,23 +1,23 @@
-package com.codano.hybridapp;
+package com.codano.orbital;
 
 import com.grack.nanojson.JsonObject;
 
-public class HybridAppData {
+public class OrbitalAppData {
 	private JsonObject json;
 	private byte[] binary;
 	
-	public HybridAppData() {
+	public OrbitalAppData() {
 	}
 
-	public HybridAppData(JsonObject json) {
+	public OrbitalAppData(JsonObject json) {
 		this.json = json;
 	}
 
-	public HybridAppData(byte[] binary) {
+	public OrbitalAppData(byte[] binary) {
 		this.binary = binary;
 	}
 
-	public HybridAppData(JsonObject json, byte[] binary) {
+	public OrbitalAppData(JsonObject json, byte[] binary) {
 		this.json = json;
 		this.binary = binary;
 	}

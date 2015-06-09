@@ -1,6 +1,6 @@
-package com.codano.hybridapp;
+package com.codano.orbital;
 
-public class HybridAppMain {
+public class OrbitalAppMain {
 	public static void main(String[] args) {
 		System.out.println("Hello world");
 	}

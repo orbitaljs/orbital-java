@@ -1,4 +1,4 @@
-package com.codano.hybridapp.ipc;
+package com.codano.orbital.ipc;
 
 import java.io.IOException;
 import java.io.InputStream;
