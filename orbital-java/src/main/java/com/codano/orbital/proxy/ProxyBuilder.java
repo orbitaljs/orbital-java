@@ -3,7 +3,9 @@ package com.codano.orbital.proxy;
 import java.lang.reflect.Method;
 import java.lang.reflect.Proxy;
 import java.util.Arrays;
+import java.util.HashMap;
 import java.util.HashSet;
+import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.Executor;
 
@@ -19,7 +21,7 @@ public class ProxyBuilder<T> {
 	private static final Set<Class<?>> PRIMITIVE_TYPES = new HashSet<>();
 	private OrbitalApp app;
 	private String name;
-	private RpcReturnType returnType;
+	private Map<String, RpcReturnType> returnTypes = new HashMap<>();
 
 	static {
 		PRIMITIVE_TYPES.add(int.class);
@@ -45,6 +47,10 @@ public class ProxyBuilder<T> {
 	
 	private void validate() {
 		for (Method method : clazz.getMethods()) {
+			String methodName = name + "." + method.getName();
+			
+			RpcReturnType returnType;
+			
 			// TODO: Offer either Future<> or Callback<> return types
 			if (method.getReturnType() == void.class) {
 				// Void is cool if annotation properly
@@ -62,13 +68,15 @@ public class ProxyBuilder<T> {
 							+ " cannot be annotated as both @Blocking and @NonBlocking");
 				
 				if (blocking)
-					returnType = new VoidBlockingReturnType(app, name);
+					returnType = new VoidBlockingReturnType(app, methodName);
 				else
-					returnType = new VoidNonBlockingReturnType(app, name);
+					returnType = new VoidNonBlockingReturnType(app, methodName);
 			} else {
 				validate(method.getName(), method.getReturnType());
-				returnType = new NonVoidBlockingReturnType(app, name);
+				returnType = new NonVoidBlockingReturnType(app, methodName);
 			}
+			
+			returnTypes.put(method.getName(), returnType);
 			
 			for (Class<?> clazz : method.getParameterTypes()) {
 				validate(method.getName(), clazz);
@@ -96,10 +104,7 @@ public class ProxyBuilder<T> {
 	private void generate() {
 		proxy = (T) Proxy.newProxyInstance(getClass().getClassLoader(),
 				new Class<?>[] { clazz }, (proxy, method, args) -> {
-			JsonArray arguments = new JsonArray();
-			arguments.addAll(Arrays.asList(args));
-
-			return returnType.invoke(arguments);
+			return returnTypes.get(method.getName()).invoke(Arrays.asList(args));
 		});
 	}
 
