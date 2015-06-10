@@ -1,16 +1,15 @@
 package com.codano.orbital;
 
 import java.io.BufferedReader;
-import java.io.File;
 import java.io.FileNotFoundException;
-import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.io.OutputStream;
 import java.io.PrintStream;
+import java.util.Arrays;
 import java.util.HashMap;
-import java.util.Map;
+import java.util.List;
 import java.util.concurrent.Executor;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -21,12 +20,13 @@ import org.apache.commons.io.Charsets;
 import org.apache.commons.io.IOUtils;
 
 import com.codano.orbital.ipc.IpcPipe;
+import com.codano.orbital.proxy.ProxyBuilder;
 
 public class OrbitalApp {
 	/**
 	 * Semaphore that indicates we should defer the RPC response.
 	 */
-	private static final OrbitalAppData DEFER_RESPONSE = new OrbitalAppData();
+	private static final Object DEFER_RESPONSE = new Object();
 
 	private String appRoot, webRoot, electronPath;
 	private LinkedBlockingQueue<OrbitalAppPacket> send = new LinkedBlockingQueue<>();
@@ -40,15 +40,20 @@ public class OrbitalApp {
 		void run() throws IOException, InterruptedException;
 	}
 	
+	private interface OrbitalAppCallback {
+		void callback(Object data);
+	}
+
 	private static class CallbackData<T> {
 		Executor executor;
 		T callback;
 	}
 
 	public OrbitalApp() {
-		registerListener("http.request", utilityThread, (ep, data) -> {
-			return handleIncomingHttpRequest(data);
-		});
+		// Waiting on https://github.com/atom/electron/issues/410
+//		registerListener("http.request", utilityThread, (ep, data) -> {
+//			return handleIncomingHttpRequest(data);
+//		});
 	}
 	
 	public void setAppRoot(String appRoot) {
@@ -63,9 +68,9 @@ public class OrbitalApp {
 		this.electronPath = electronPath;
 	}
 	
-	public OrbitalAppData callBlocking(String endpoint, OrbitalAppData data) {
-		LinkedBlockingQueue<OrbitalAppData> q = new LinkedBlockingQueue<>(1);
-		call(endpoint, data, utilityThread, (retval) -> {
+	public Object callBlocking(String endpoint, List<Object> arguments) {
+		LinkedBlockingQueue<Object> q = new LinkedBlockingQueue<>(1);
+		call(endpoint, arguments, utilityThread, (retval) -> {
 			try {
 				q.put(retval);
 			} catch (Exception e) {
@@ -82,7 +87,7 @@ public class OrbitalApp {
 		}
 	}
 	
-	public void call(String endpoint, OrbitalAppData data, Executor executor, OrbitalAppCallback callback) {
+	public void call(String endpoint, List<Object> arguments, Executor executor, OrbitalAppCallback callback) {
 		int seq = seqId.incrementAndGet();
 		CallbackData<OrbitalAppCallback> callbackData = new CallbackData<>();
 		callbackData.callback = callback;
@@ -91,10 +96,10 @@ public class OrbitalApp {
 			callbacks.put(seq, callbackData);
 		}
 		
-		send.add(new OrbitalAppPacket(true, endpoint, seq, data));
+		send.add(new OrbitalAppPacket(true, endpoint, seq, arguments));
 	}
 
-	public void callNoReturn(String endpoint, OrbitalAppData data) {
+	public void callNoReturn(String endpoint, List<Object> data) {
 		// seq ID of zero -- no return value requested
 		send.add(new OrbitalAppPacket(true, endpoint, 0, data));
 	}
@@ -136,36 +141,12 @@ public class OrbitalApp {
 	
 	private Process launchElectron(IpcPipe pipe) throws IOException,
 			FileNotFoundException {
-		File parent = File.createTempFile("hybrid-app-", "");
-		parent.delete();
-		parent.mkdirs();
-		File include = new File(parent, "include");
-		include.mkdirs();
-		
-		File index = new File(parent, "index.js");
-		File rpc = new File(include, "rpc.js");
-
-		try (FileOutputStream out = new FileOutputStream(index)) {
-			try (InputStream in = getClass().getResourceAsStream("/index.js")) {
-				IOUtils.copy(in, out);
-			}
-		}
-		try (FileOutputStream out = new FileOutputStream(rpc)) {
-			try (InputStream in = getClass().getResourceAsStream("/rpc.js")) {
-				IOUtils.copy(in, out);
-			}
-		}
-
-		index.deleteOnExit();
-		rpc.deleteOnExit();
-		parent.deleteOnExit();
-		
-		ProcessBuilder processBuilder = new ProcessBuilder(electronPath, index.getAbsolutePath());
+		ProcessBuilder processBuilder = new ProcessBuilder(electronPath, appRoot);
 		processBuilder.environment().put("PIPE", pipe.getName());
-		processBuilder.environment().put("NODE_PATH", include.getAbsolutePath());
-		processBuilder.environment().put("APP_PATH", appRoot);
 		processBuilder.environment().put("WEB_PATH", webRoot);
 		Process process = processBuilder.start();
+		
+		System.out.println("Launching " + processBuilder.command());
 		
 		drain(process.getInputStream(), System.out);
 		drain(process.getErrorStream(), System.err);
@@ -244,18 +225,18 @@ public class OrbitalApp {
 		}
 	}
 
-	private OrbitalAppData handleIncomingHttpRequest(OrbitalAppData data) {
-		String url = data.getJson().getString("url");
-		CallbackData<OrbitalAppHttpEndpoint> callback = httpListeners.get(url);
-		callback.executor.execute(() -> {
-			@SuppressWarnings({ "unchecked", "rawtypes" })
-			Map<String, String> query = (Map)data.getJson().getObject("query");
-			OrbitalAppHttpResponse response = callback.callback.request(url, query);
-			
-		});
-		
-		return DEFER_RESPONSE;
-	}
+//	private List<Object> handleIncomingHttpRequest(List<Object> data) {
+//		String url = data.getJson().getString("url");
+//		CallbackData<OrbitalAppHttpEndpoint> callback = httpListeners.get(url);
+//		callback.executor.execute(() -> {
+//			@SuppressWarnings({ "unchecked", "rawtypes" })
+//			Map<String, String> query = (Map)data.getJson().getObject("query");
+//			OrbitalAppHttpResponse response = callback.callback.request(url, query);
+//			
+//		});
+//		
+//		return DEFER_RESPONSE;
+//	}
 
 	private void handleIncomingPacket(byte[] buffer) {
 		OrbitalAppPacket packet = PacketCoder.decode(buffer);
@@ -282,12 +263,11 @@ public class OrbitalApp {
 						if (data == DEFER_RESPONSE)
 							return;
 						
-						if (data == null)
-							data = new OrbitalAppData();
-						
 						if (seqId != 0) {
 							// Send return value
-							send.add(new OrbitalAppPacket(false, null, seqId, data));
+									send.add(new OrbitalAppPacket(false, null,
+											seqId, data == null ? null : Arrays
+													.asList(data)));
 						}
 					});					
 				});
@@ -328,5 +308,13 @@ public class OrbitalApp {
 		data.callback = listener;
 		data.executor = executor;
 		httpListeners.put(endpoint, data);
+	}
+
+	public <T> T getRemoteProxy(String name, Class<T> clazz) {
+		return ProxyBuilder.of(this, name, null, clazz).get();
+	}
+	
+	public <T> T getRemoteProxy(String name, Executor executor, Class<T> clazz) {
+		return ProxyBuilder.of(this, name, executor, clazz).get();
 	}
 }
