@@ -28,7 +28,7 @@ public class OrbitalApp {
 	 */
 	private static final Object DEFER_RESPONSE = new Object();
 
-	private String appRoot, webRoot, electronPath;
+	private String appRoot, electronPath;
 	private LinkedBlockingQueue<OrbitalAppPacket> send = new LinkedBlockingQueue<>();
 	private AtomicInteger seqId = new AtomicInteger();
 	private HashMap<Integer, CallbackData<OrbitalAppCallback>> callbacks = new HashMap<>();
@@ -54,14 +54,13 @@ public class OrbitalApp {
 //		registerListener("http.request", utilityThread, (ep, data) -> {
 //			return handleIncomingHttpRequest(data);
 //		});
+		
+		appRoot = System.getProperty("app.root");
+		electronPath = System.getProperty("electron.path");
 	}
 	
 	public void setAppRoot(String appRoot) {
 		this.appRoot = appRoot;
-	}
-
-	public void setWebRoot(String webRoot) {
-		this.webRoot = webRoot;
 	}
 	
 	public void setElectronPath(String electronPath) {
@@ -108,11 +107,15 @@ public class OrbitalApp {
 		IpcPipe pipe;
 		Process process = null;
 
-		if (System.getenv("PIPE") == null) {
+		System.out.println("Hello 2!");
+
+		if (System.getProperty("PIPE") == null) {
+			System.out.println("Launching Electron");
 			pipe = IpcPipe.create();
 			process = launchElectron(pipe);
 		} else {
-			pipe = IpcPipe.connect(System.getenv("PIPE"));
+			System.out.println("Connecting to pipe: " + System.getProperty("PIPE"));
+			pipe = IpcPipe.connect(System.getProperty("PIPE"));
 		}
 		
 		pipe.start();
@@ -143,7 +146,6 @@ public class OrbitalApp {
 			FileNotFoundException {
 		ProcessBuilder processBuilder = new ProcessBuilder(electronPath, appRoot);
 		processBuilder.environment().put("PIPE", pipe.getName());
-		processBuilder.environment().put("WEB_PATH", webRoot);
 		Process process = processBuilder.start();
 		
 		System.out.println("Launching " + processBuilder.command());
@@ -310,11 +312,11 @@ public class OrbitalApp {
 		httpListeners.put(endpoint, data);
 	}
 
-	public <T> T getRemoteProxy(String name, Class<T> clazz) {
+	public <T extends OrbitalRemoteProxy> T getRemoteProxy(String name, Class<T> clazz) {
 		return ProxyBuilder.of(this, name, null, clazz).get();
 	}
 	
-	public <T> T getRemoteProxy(String name, Executor executor, Class<T> clazz) {
+	public <T extends OrbitalRemoteProxy> T getRemoteProxy(String name, Executor executor, Class<T> clazz) {
 		return ProxyBuilder.of(this, name, executor, clazz).get();
 	}
 }
