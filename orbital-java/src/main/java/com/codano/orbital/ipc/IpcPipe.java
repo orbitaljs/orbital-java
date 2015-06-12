@@ -47,7 +47,7 @@ public abstract class IpcPipe {
 	 * Connects to an IPC pipe with a given name.
 	 */
 	public static IpcPipe connect(String name) throws IOException {
-		if (System.getProperty("os.name").startsWith("windows")) {
+		if (System.getProperty("os.name").toLowerCase().startsWith("windows")) {
 			return new IpcPipeWindows(name);
 		} else {
 			return new IpcPipePosix(name);

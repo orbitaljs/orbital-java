@@ -145,11 +145,11 @@ public class OrbitalApp {
 	
 	private Process launchElectron(IpcPipe pipe) throws IOException,
 			FileNotFoundException {
+		System.out.println("Launching " + electronPath);
+		
 		ProcessBuilder processBuilder = new ProcessBuilder(electronPath, appRoot);
 		processBuilder.environment().put("PIPE", pipe.getName());
 		Process process = processBuilder.start();
-		
-		System.out.println("Launching " + processBuilder.command());
 		
 		drain(process.getInputStream(), System.out);
 		drain(process.getErrorStream(), System.err);
@@ -252,7 +252,11 @@ public class OrbitalApp {
 			}
 			if (callback != null) {
 				callback.executor.execute(() -> {
-					callback.callback.callback(packet.getData());
+					List<Object> data = packet.getData();
+					if (data == null || data.size() == 0)
+						callback.callback.callback(null);
+					else
+						callback.callback.callback(data.get(0));
 				});
 			} else {
 				System.err.println("No callback for seq ID " + seqId);
