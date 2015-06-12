@@ -116,6 +116,7 @@ public class OrbitalApp {
 		} else {
 			System.out.println("Connecting to pipe: " + System.getProperty("PIPE"));
 			pipe = IpcPipe.connect(System.getProperty("PIPE"));
+			System.out.println("Connected to pipe: " + System.getProperty("PIPE"));
 		}
 		
 		pipe.start();

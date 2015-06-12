@@ -16,11 +16,11 @@ class IpcPipeWindows extends IpcPipe {
 	}
 	
 	private static String generate() {
-		return "\\\\.\\pipe\\ipc-" + UUID.randomUUID();
+		return UUID.randomUUID().toString();
 	}
 
 	protected void attemptConnect() throws IOException {
-		file = new RandomAccessFile(name, "rw");
+		file = new RandomAccessFile("\\\\?\\pipe\\" + name, "rw");
 		
 		is = new InputStream() {
 			@Override
